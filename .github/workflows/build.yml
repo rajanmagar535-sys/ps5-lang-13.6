@@ -14,21 +14,28 @@ jobs:
       - name: Install Environment
         run: |
           sudo apt-get update
-          sudo apt-get install -y clang lld git
+          sudo apt-get install -y clang lld git make
           
       - name: Compile
         run: |
-          # 1. 专门下载原作者当年使用的老版 SDK (完美对齐路径)
-          git clone https://github.com/ps5-payload-dev/sdk.git ps5-sdk
+          # 1. 完整下载老版 SDK（加上 --recursive 才能把缺失的 toolchain 文件夹下回来）
+          git clone --recursive https://github.com/ps5-payload-dev/sdk.git ps5-sdk
+          
+          # 2. 预先编译 SDK 的基础库，防止缺文件
+          cd ps5-sdk
+          make
+          cd ..
+          
+          # 3. 设置正确的环境变量路径
           export PS5_PAYLOAD_SDK=$GITHUB_WORKSPACE/ps5-sdk
           
-          # 2. 下载原作者的源码项目
+          # 4. 下载原作者的源码项目
           git clone https://github.com/owendswang/ps5-syslang.git build_dir
           
-          # 3. 将我们仓库里的 main.cpp (已修改sprx后缀)，强行覆盖进去
+          # 5. 将我们修改好 sprx 后缀的 main.cpp 强行覆盖进去
           cp main.cpp build_dir/main.cpp
           
-          # 4. 进入文件夹，使用原作者自带的 Makefile 编译
+          # 6. 进入文件夹，使用原作者自带的完美 Makefile 进行编译
           cd build_dir
           make
           
