@@ -11,43 +11,35 @@ jobs:
       - name: Checkout Code
         uses: actions/checkout@v4
 
-      - name: Install Environment
+      - name: Compile using Official Docker
         run: |
-          sudo apt-get update
-          sudo apt-get install -y clang lld git make
+          # 1. 把编译指令写成一个脚本
+          cat << 'EOF' > build.sh
+          #!/bin/bash
+          set -e
           
-      - name: Install PS5 SDK
-        run: |
-          # 1. 请回老版的 ps5-payload-dev SDK，并保证完整下载（--recursive）
-          git clone --recursive https://github.com/ps5-payload-dev/sdk.git ps5-sdk
-          cd ps5-sdk
-          # 2. 核心步骤：必须先编译 SDK 本身，它才会吐出我们需要的文件
-          make
-          # 3. 安装到系统目录
-          sudo make DESTDIR=/opt/ps5-payload-sdk install
+          echo "正在大神官方环境中搜索编译模板..."
+          # 自动抓取官方镜像里自带的 .mk 配置文件
+          MK_PATH=$(find /opt/ps5-payload-sdk/share -name "*.mk" | head -n 1)
+          echo "成功找到模板: $MK_PATH"
           
-      - name: Compile
-        run: |
-          export PS5_PAYLOAD_SDK=/opt/ps5-payload-sdk
-          
-          # 4. 全球智能搜索那个神出鬼没的 payload.mk
-          MK_PATH=$(find /opt/ps5-payload-sdk -name "payload.mk" | head -n 1)
-          if [ -z "$MK_PATH" ]; then
-            MK_PATH=$(find $GITHUB_WORKSPACE/ps5-sdk -name "payload.mk" | head -n 1)
-          fi
-          
-          echo "已成功定位配置文件路径: $MK_PATH"
-          
-          # 5. 现场手写一份绝对不会路径冲突的 Makefile
-          cat << EOF > Makefile
-          TARGET = ps5-syslang
+          echo "正在生成 Makefile..."
+          cat << MAKEFILE > Makefile
+          TARGET = ps5-syslang.elf
           OBJS = main.o
           CXXFLAGS = -O2 -Wall -std=c++11
+          PS5_PAYLOAD_SDK = /opt/ps5-payload-sdk
           include $MK_PATH
+          MAKEFILE
+          
+          echo "开始最终编译..."
+          make
           EOF
           
-          # 6. 开始最终编译
-          make
+          chmod +x build.sh
+          
+          # 2. 召唤大神的官方 PS5 SDK 镜像，并在里面运行上面的脚本
+          docker run --rm -v ${{ github.workspace }}:/src -w /src ghcr.io/john-tornblom/ps5-payload-sdk:latest ./build.sh
           
       - name: Upload ELF
         uses: actions/upload-artifact@v4
