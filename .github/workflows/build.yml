@@ -16,16 +16,13 @@ jobs:
           sudo apt-get update
           sudo apt-get install -y clang lld git
           
-      - name: Install PS5 SDK
+      - name: Prepare SDK
         run: |
-          git clone https://github.com/john-tornblom/ps5-payload-sdk.git
-          cd ps5-payload-sdk
-          make
-          sudo make install PREFIX=/opt/ps5-payload-sdk
+          git clone https://github.com/ps5-payload-dev/sdk.git ps5-sdk
           
       - name: Compile
         run: |
-          export PS5_PAYLOAD_SDK=/opt/ps5-payload-sdk
+          export PS5_PAYLOAD_SDK=$GITHUB_WORKSPACE/ps5-sdk
           make
           
       - name: Upload ELF
