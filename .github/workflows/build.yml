@@ -14,23 +14,21 @@ jobs:
       - name: Install Environment
         run: |
           sudo apt-get update
-          sudo apt-get install -y clang lld git python3 python3-pyelftools
-          
-      - name: Install PS5 SDK
-        run: |
-          git clone https://github.com/john-tornblom/ps5-payload-sdk.git
-          cd ps5-payload-sdk
-          make
-          sudo make install
+          sudo apt-get install -y clang lld git
           
       - name: Compile
         run: |
-          export PS5_PAYLOAD_SDK=/opt/ps5-payload-sdk
-          # 1. 下载原作者的完整代码库
+          # 1. 专门下载原作者当年使用的老版 SDK (完美对齐路径)
+          git clone https://github.com/ps5-payload-dev/sdk.git ps5-sdk
+          export PS5_PAYLOAD_SDK=$GITHUB_WORKSPACE/ps5-sdk
+          
+          # 2. 下载原作者的源码项目
           git clone https://github.com/owendswang/ps5-syslang.git build_dir
-          # 2. 把我们修改好的 main.cpp 强行覆盖进原作者的代码库里
-          find build_dir -name "main.cpp" -exec cp main.cpp {} \;
-          # 3. 借用原作者自带的正确 Makefile 进行编译
+          
+          # 3. 将我们仓库里的 main.cpp (已修改sprx后缀)，强行覆盖进去
+          cp main.cpp build_dir/main.cpp
+          
+          # 4. 进入文件夹，使用原作者自带的 Makefile 编译
           cd build_dir
           make
           
