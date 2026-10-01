@@ -14,37 +14,43 @@ jobs:
       - name: Install Environment
         run: |
           sudo apt-get update
-          sudo apt-get install -y clang lld git make python3
+          sudo apt-get install -y clang lld git make
           
       - name: Install PS5 SDK
         run: |
-          # 换回维护最好、编译最快的新版 SDK，并完整克隆
-          git clone --recursive https://github.com/john-tornblom/ps5-payload-sdk.git
-          cd ps5-payload-sdk
+          # 1. 请回老版的 ps5-payload-dev SDK，并保证完整下载（--recursive）
+          git clone --recursive https://github.com/ps5-payload-dev/sdk.git ps5-sdk
+          cd ps5-sdk
+          # 2. 核心步骤：必须先编译 SDK 本身，它才会吐出我们需要的文件
           make
-          sudo make install
+          # 3. 安装到系统目录
+          sudo make DESTDIR=/opt/ps5-payload-sdk install
           
       - name: Compile
         run: |
           export PS5_PAYLOAD_SDK=/opt/ps5-payload-sdk
           
-          # 智能搜索核心配置文件的真实位置 (抓取它到底被安装在了哪里)
+          # 4. 全球智能搜索那个神出鬼没的 payload.mk
           MK_PATH=$(find /opt/ps5-payload-sdk -name "payload.mk" | head -n 1)
+          if [ -z "$MK_PATH" ]; then
+            MK_PATH=$(find $GITHUB_WORKSPACE/ps5-sdk -name "payload.mk" | head -n 1)
+          fi
+          
           echo "已成功定位配置文件路径: $MK_PATH"
           
-          # 现场直接生成一份完美的 Makefile，强行覆盖掉旧文件
+          # 5. 现场手写一份绝对不会路径冲突的 Makefile
           cat << EOF > Makefile
-          TARGET = ps5-syslang.elf
+          TARGET = ps5-syslang
           OBJS = main.o
           CXXFLAGS = -O2 -Wall -std=c++11
           include $MK_PATH
           EOF
           
-          # 开始最终的编译
+          # 6. 开始最终编译
           make
           
       - name: Upload ELF
         uses: actions/upload-artifact@v4
         with:
           name: ps5-syslang-elf
-          path: ps5-syslang.elf
+          path: "*.elf"
