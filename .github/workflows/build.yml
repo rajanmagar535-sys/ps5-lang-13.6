@@ -14,33 +14,37 @@ jobs:
       - name: Install Environment
         run: |
           sudo apt-get update
-          sudo apt-get install -y clang lld git make
+          sudo apt-get install -y clang lld git make python3
+          
+      - name: Install PS5 SDK
+        run: |
+          # 换回维护最好、编译最快的新版 SDK，并完整克隆
+          git clone --recursive https://github.com/john-tornblom/ps5-payload-sdk.git
+          cd ps5-payload-sdk
+          make
+          sudo make install
           
       - name: Compile
         run: |
-          # 1. 完整下载老版 SDK（加上 --recursive 才能把缺失的 toolchain 文件夹下回来）
-          git clone --recursive https://github.com/ps5-payload-dev/sdk.git ps5-sdk
+          export PS5_PAYLOAD_SDK=/opt/ps5-payload-sdk
           
-          # 2. 预先编译 SDK 的基础库，防止缺文件
-          cd ps5-sdk
-          make
-          cd ..
+          # 智能搜索核心配置文件的真实位置 (抓取它到底被安装在了哪里)
+          MK_PATH=$(find /opt/ps5-payload-sdk -name "payload.mk" | head -n 1)
+          echo "已成功定位配置文件路径: $MK_PATH"
           
-          # 3. 设置正确的环境变量路径
-          export PS5_PAYLOAD_SDK=$GITHUB_WORKSPACE/ps5-sdk
+          # 现场直接生成一份完美的 Makefile，强行覆盖掉旧文件
+          cat << EOF > Makefile
+          TARGET = ps5-syslang.elf
+          OBJS = main.o
+          CXXFLAGS = -O2 -Wall -std=c++11
+          include $MK_PATH
+          EOF
           
-          # 4. 下载原作者的源码项目
-          git clone https://github.com/owendswang/ps5-syslang.git build_dir
-          
-          # 5. 将我们修改好 sprx 后缀的 main.cpp 强行覆盖进去
-          cp main.cpp build_dir/main.cpp
-          
-          # 6. 进入文件夹，使用原作者自带的完美 Makefile 进行编译
-          cd build_dir
+          # 开始最终的编译
           make
           
       - name: Upload ELF
         uses: actions/upload-artifact@v4
         with:
           name: ps5-syslang-elf
-          path: build_dir/*.elf
+          path: ps5-syslang.elf
