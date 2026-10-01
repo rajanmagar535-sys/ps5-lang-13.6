@@ -11,38 +11,48 @@ jobs:
       - name: Checkout Code
         uses: actions/checkout@v4
 
-      - name: Compile using Official Docker
+      - name: Install Environment
         run: |
-          # 1. 把编译指令写成一个脚本
-          cat << 'EOF' > build.sh
-          #!/bin/bash
-          set -e
+          sudo apt-get update
+          sudo apt-get install -y clang lld git make
           
-          echo "正在大神官方环境中搜索编译模板..."
-          # 自动抓取官方镜像里自带的 .mk 配置文件
-          MK_PATH=$(find /opt/ps5-payload-sdk/share -name "*.mk" | head -n 1)
-          echo "成功找到模板: $MK_PATH"
+      - name: Build SDK & Hijack Sample
+        run: |
+          # 1. 下载新版 SDK 并让它在当前机器上编译自身（绝不缺文件）
+          git clone https://github.com/john-tornblom/ps5-payload-sdk.git
+          cd ps5-payload-sdk
+          make -j$(nproc)
+          sudo make install
           
-          echo "正在生成 Makefile..."
-          cat << MAKEFILE > Makefile
-          TARGET = ps5-syslang.elf
-          OBJS = main.o
-          CXXFLAGS = -O2 -Wall -std=c++11
-          PS5_PAYLOAD_SDK = /opt/ps5-payload-sdk
-          include $MK_PATH
-          MAKEFILE
+          # 2. 搜索 SDK 自带的测试样例目录（抓取官方原配的 Makefile）
+          SAMPLE_MK=$(find . -mindepth 2 -name "Makefile" -exec grep -l "^ *include " {} + | head -n 1)
+          SAMPLE_DIR=$(dirname "$SAMPLE_MK")
+          echo "成功锁定 SDK 内部样例目录: $SAMPLE_DIR"
           
-          echo "开始最终编译..."
-          make
+          # 3. 提取官方 Makefile 里的核心编译引入指令
+          INCLUDE_LINE=$(grep "^ *include " "$SAMPLE_MK" | head -n 1)
+          
+          # 4. 狸猫换太子：重写样例的配置文件，把名字改成我们的插件
+          cat << EOF > "$SAMPLE_DIR/Makefile"
+          TARGET := ps5-syslang.elf
+          OBJS := main.o
+          CXXFLAGS := -O2 -Wall -std=c++11
+          $INCLUDE_LINE
           EOF
           
-          chmod +x build.sh
+          # 5. 毁尸灭迹：删掉样例原本的代码，把我们的 main.cpp 偷渡进去
+          rm -f $SAMPLE_DIR/*.c $SAMPLE_DIR/*.cpp $SAMPLE_DIR/*.o
+          cp ../main.cpp "$SAMPLE_DIR/main.cpp"
           
-          # 2. 召唤大神的官方 PS5 SDK 镜像，并在里面运行上面的脚本
-          docker run --rm -v ${{ github.workspace }}:/src -w /src ghcr.io/john-tornblom/ps5-payload-sdk:latest ./build.sh
+          # 6. 在样例目录里执行编译（用官方环境编译，绝对畅通无阻）
+          cd "$SAMPLE_DIR"
+          make
+          
+          # 7. 把编译好的成品提炼出来
+          cp ps5-syslang.elf $GITHUB_WORKSPACE/
           
       - name: Upload ELF
         uses: actions/upload-artifact@v4
         with:
           name: ps5-syslang-elf
-          path: "*.elf"
+          path: ps5-syslang.elf
