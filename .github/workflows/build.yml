@@ -14,15 +14,18 @@ jobs:
       - name: Install Environment
         run: |
           sudo apt-get update
-          sudo apt-get install -y clang lld git
+          sudo apt-get install -y clang lld git python3 python3-pyelftools
           
-      - name: Prepare SDK
+      - name: Install PS5 SDK
         run: |
-          git clone https://github.com/ps5-payload-dev/sdk.git ps5-sdk
+          git clone https://github.com/john-tornblom/ps5-payload-sdk.git
+          cd ps5-payload-sdk
+          make
+          sudo make install
           
       - name: Compile
         run: |
-          export PS5_PAYLOAD_SDK=$GITHUB_WORKSPACE/ps5-sdk
+          export PS5_PAYLOAD_SDK=/opt/ps5-payload-sdk
           make
           
       - name: Upload ELF
