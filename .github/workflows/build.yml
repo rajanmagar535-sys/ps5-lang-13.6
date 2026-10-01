@@ -26,10 +26,16 @@ jobs:
       - name: Compile
         run: |
           export PS5_PAYLOAD_SDK=/opt/ps5-payload-sdk
+          # 1. 下载原作者的完整代码库
+          git clone https://github.com/owendswang/ps5-syslang.git build_dir
+          # 2. 把我们修改好的 main.cpp 强行覆盖进原作者的代码库里
+          find build_dir -name "main.cpp" -exec cp main.cpp {} \;
+          # 3. 借用原作者自带的正确 Makefile 进行编译
+          cd build_dir
           make
           
       - name: Upload ELF
         uses: actions/upload-artifact@v4
         with:
           name: ps5-syslang-elf
-          path: ps5-syslang.elf
+          path: build_dir/*.elf
