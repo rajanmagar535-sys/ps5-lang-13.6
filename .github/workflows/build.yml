@@ -14,13 +14,14 @@ jobs:
       - name: Install Environment
         run: |
           sudo apt-get update
-          sudo apt-get install -y clang-15 lld-15 git
+          sudo apt-get install -y clang lld git
           
       - name: Install PS5 SDK
         run: |
-          git clone https://github.com/ps5-payload-dev/sdk.git
-          cd sdk
-          sudo make DESTDIR=/opt/ps5-payload-sdk install
+          git clone https://github.com/john-tornblom/ps5-payload-sdk.git
+          cd ps5-payload-sdk
+          make
+          sudo make install PREFIX=/opt/ps5-payload-sdk
           
       - name: Compile
         run: |
